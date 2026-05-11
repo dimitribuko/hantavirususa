@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HantavirusUSA.org — Live Outbreak Tracker</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--red:#E63946;--orange:#F4A261;--green:#52B788;--bg:#0a0a0a;--bg2:#111;--bg3:#1a1a1a;--border:#2a2a2a;--text:#e8e8e8;--muted:#888;--mono:'Share Tech Mono',monospace;--sans:'Inter',sans-serif}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans)}
+  .header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:50px;background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2000}
+  .logo{display:flex;align-items:center;gap:10px}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--red);animation:blink 1.2s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+  .logo-text{font-family:var(--mono);font-size:15px;letter-spacing:.1em}
+  .live{font-size:10px;font-family:var(--mono);color:var(--red);border:1px solid var(--red);padding:2px 7px;border-radius:3px}
+  .clock{font-size:11px;color:var(--muted);font-family:var(--mono)}
+  .ticker{background:rgba(230,57,70,.07);border-bottom:1px solid rgba(230,57,70,.15);padding:5px 0;overflow:hidden;white-space:nowrap}
+  .t-inner{display:inline-block;animation:scroll 45s linear infinite}
+  @keyframes scroll{from{transform:translateX(100vw)}to{transform:translateX(-100%)}}
+  .t-item{font-size:11px;font-family:var(--mono);color:var(--red);margin-right:80px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);background:var(--bg2)}
+  .stat{padding:12px 20px;border-right:1px solid var(--border);text-align:center}
+  .stat:last-child{border-right:none}
+  .sn{font-family:var(--mono);font-size:26px}
+  .sl{font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.07em}
+  .ss{font-size:10px;margin-top:2px}
+  .main{display:grid;grid-template-columns:1fr 290px;height:calc(100vh - 50px - 30px - 54px - 150px);min-height:380px}
+  #map{width:100%;height:100%}
+  .sidebar{background:var(--bg2);border-left:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+  .sb{padding:14px;border-bottom:1px solid var(--border)}
+  .st{font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px}
+  .ob{padding:9px 11px;border:1px solid var(--border);border-radius:4px;margin-bottom:7px;cursor:pointer;transition:background .12s}
+  .ob:hover{background:var(--bg3)}
+  .ob.hl{border-color:var(--red)}
+  .ob-row{display:flex;justify-content:space-between;align-items:flex-start;gap:6px}
+  .on{font-size:13px;font-weight:500}
+  .ol{font-size:11px;color:var(--muted);margin-top:1px}
+  .os{font-size:11px;color:var(--muted);margin-top:3px}
+  .badge{font-size:9px;font-family:var(--mono);padding:2px 5px;border-radius:2px;white-space:nowrap;font-weight:600}
+  .bh{background:rgba(230,57,70,.18);color:var(--red);border:1px solid rgba(230,57,70,.3)}
+  .bm{background:rgba(244,162,97,.18);color:var(--orange);border:1px solid rgba(244,162,97,.3)}
+  .bl{background:rgba(82,183,136,.18);color:var(--green);border:1px solid rgba(82,183,136,.3)}
+  .bar{height:2px;background:var(--border);border-radius:1px;margin-top:7px}
+  .fill{height:100%;border-radius:1px}
+  .ni{padding:7px 0;border-bottom:1px solid var(--border)}
+  .ni:last-child{border-bottom:none}
+  .ns{font-size:10px;font-family:var(--mono);color:var(--muted)}
+  .nt{font-size:12px;line-height:1.4;margin-top:2px}
+  .ntm{font-size:10px;color:var(--muted);margin-top:2px}
+  /* SIGNALS TABLE */
+  .sig-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px}
+  .sig-row:last-child{border-bottom:none}
+  .sig-country{color:var(--text)}
+  .sig-num{font-family:var(--mono);color:var(--orange)}
+  .sig-bar-wrap{width:80px;height:3px;background:var(--border);border-radius:2px;margin:0 8px}
+  .sig-bar-fill{height:100%;border-radius:2px;background:var(--orange)}
+  /* ADS */
+  .ads{background:var(--bg2);border-top:1px solid var(--border);padding:10px 16px}
+  .al{font-size:10px;color:var(--muted);font-family:var(--mono);letter-spacing:.1em;margin-bottom:8px}
+  .ag{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+  .ac{background:#fff;border:1px solid var(--border);border-radius:5px;overflow:hidden;cursor:pointer;text-decoration:none;display:block;transition:border-color .15s,transform .15s}
+  .ac:hover{border-color:#555;transform:translateY(-1px)}
+  .ai{width:100%;aspect-ratio:1;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center}
+  .ai img{width:100%;height:100%;object-fit:contain;padding:4px}
+  .ainfo{padding:5px 7px;background:var(--bg3)}
+  .an{font-size:10px;color:var(--muted);line-height:1.3;margin-bottom:2px}
+  .ap{font-size:11px;color:var(--orange);font-family:var(--mono)}
+  .legend{position:absolute;bottom:20px;left:12px;z-index:1000;background:rgba(10,10,10,.92);border:1px solid var(--border);border-radius:4px;padding:9px 13px}
+  .li{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted);margin-bottom:4px}
+  .li:last-child{margin-bottom:0}
+  .ld{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  ::-webkit-scrollbar{width:3px}
+  ::-webkit-scrollbar-track{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:var(--border)}
+  .leaflet-popup-content-wrapper{background:#111!important;color:#e8e8e8!important;border:1px solid #2a2a2a!important;border-radius:5px!important;box-shadow:0 4px 24px rgba(0,0,0,.9)!important}
+  .leaflet-popup-tip{background:#111!important}
+  .leaflet-popup-close-button{color:#666!important}
+  .leaflet-popup-content{margin:14px 16px!important}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="pulse"></div>
+    <span class="logo-text">HANTAVIRUSUSA.ORG</span>
+    <span class="live">LIVE</span>
+  </div>
+  <span class="clock" id="clk">--</span>
+</div>
+
+<div class="ticker">
+  <div class="t-inner">
+    <span class="t-item">BREAKING: MV Hondius docked Tenerife · 8 confirmed Andes hantavirus cases · 3 deaths · WHO DON599</span>
+    <span class="t-item">USA: 23 signals tracked · CDC monitoring returned passengers in TX, FL, CA, NY, WA · 0 confirmed cases</span>
+    <span class="t-item">Spain: 286 signals — highest in world · Tenerife receiving ship and evacuated passengers</span>
+    <span class="t-item">Argentina: 26 signals · Patagonia exposure site confirmed · Buenos Aires landfill birdwatching excursion</span>
+    <span class="t-item">UK: 21 signals · Army parachuted onto remote island to help Briton with suspected hantavirus</span>
+    <span class="t-item">Germany: 20 signals · 4 German passengers en route home from Tenerife · Frankfurt quarantine</span>
+    <span class="t-item">Americas: HPS endemic · Andes virus Patagonia seasonal activity · Sin Nombre virus USA Four Corners region</span>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="sn" style="color:var(--red)">8</div><div class="sl">Confirmed Cases</div><div class="ss" style="color:var(--red)">WHO DON599</div></div>
+  <div class="stat"><div class="sn" style="color:var(--orange)">3</div><div class="sl">Fatalities</div><div class="ss" style="color:var(--red)">MV Hondius</div></div>
+  <div class="stat"><div class="sn" style="color:var(--text)">1,007</div><div class="sl">Global Signals</div><div class="ss" style="color:var(--orange)">WHO·CDC·ProMED</div></div>
+  <div class="stat"><div class="sn" style="color:var(--green)">147</div><div class="sl">On Board Monitored</div><div class="ss" style="color:var(--green)">MV Hondius crew</div></div>
+</div>
+
+<div class="main">
+  <div style="position:relative">
+    <div id="map"></div>
+    <div class="legend">
+      <div class="li"><div class="ld" style="background:#E63946"></div>Confirmed / High Signals</div>
+      <div class="li"><div class="ld" style="background:#F4A261"></div>Monitoring / Medium</div>
+      <div class="li"><div class="ld" style="background:#52B788"></div>Endemic / Watch</div>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <!-- OUTBREAKS -->
+    <div class="sb">
+      <div class="st">Active Outbreaks</div>
+      <div class="ob hl" onclick="go(28.5,-16.3,6)">
+        <div class="ob-row"><div><div class="on">Hantavirus — MV Hondius</div><div class="ol">Tenerife, Canary Islands</div><div class="os">8 confirmed · 3 deaths · WHO DON599</div></div><span class="badge bh">HIGH</span></div>
+        <div class="bar"><div class="fill" style="width:90%;background:#E63946"></div></div>
+      </div>
+      <div class="ob" onclick="go(40.4168,-3.7038,5)">
+        <div class="ob-row"><div><div class="on">Spain — 286 signals</div><div class="ol">Tenerife · receiving evacuees</div><div class="os">Highest signal count globally</div></div><span class="badge bh">286</span></div>
+        <div class="bar"><div class="fill" style="width:100%;background:#E63946"></div></div>
+      </div>
+      <div class="ob" onclick="go(37,-95,4)">
+        <div class="ob-row"><div><div class="on">USA — 23 signals</div><div class="ol">TX, FL, CA, NY, WA</div><div class="os">CDC monitoring · 0 confirmed</div></div><span class="badge bm">WATCH</span></div>
+        <div class="bar"><div class="fill" style="width:30%;background:#F4A261"></div></div>
+      </div>
+      <div class="ob" onclick="go(-40,-65,5)">
+        <div class="ob-row"><div><div class="on">Argentina — 26 signals</div><div class="ol">Patagonia · Buenos Aires</div><div class="os">Exposure origin · seasonal endemic</div></div><span class="badge bh">26</span></div>
+        <div class="bar"><div class="fill" style="width:45%;background:#E63946"></div></div>
+      </div>
+      <div class="ob" onclick="go(51.5,-0.1,5)">
+        <div class="ob-row"><div><div class="on">UK — 21 signals</div><div class="ol">Remote island incident</div><div class="os">Army parachute response</div></div><span class="badge bm">21</span></div>
+        <div class="bar"><div class="fill" style="width:25%;background:#F4A261"></div></div>
+      </div>
+      <div class="ob" onclick="go(51.1657,10.4515,5)">
+        <div class="ob-row"><div><div class="on">Germany — 20 signals</div><div class="ol">Frankfurt quarantine</div><div class="os">4 passengers returning from Tenerife</div></div><span class="badge bm">20</span></div>
+        <div class="bar"><div class="fill" style="width:22%;background:#F4A261"></div></div>
+      </div>
+    </div>
+
+    <!-- SIGNAL TABLE -->
+    <div class="sb">
+      <div class="st">Signals by Country · hantavirusmap.com</div>
+      <div class="sig-row"><span class="sig-country">🇪🇸 Spain</span><div style="display:flex;align-items:center"><div class="sig-bar-wrap"><div class="sig-bar-fill" style="width:100%"></div></div><span class="sig-num">286</span></div></div>
+      <div class="sig-row"><span class="sig-country">🇦🇷 Argentina</span><div style="display:flex;align-items:center"><div class="sig-bar-wrap"><div class="sig-bar-fill" style="width:9%"></div></div><span class="sig-num">26</span></div></div>
+      <div class="sig-row"><span class="sig-country">🇺🇸 USA</span><div style="display:flex;align-items:center"><div class="sig-bar-wrap"><div class="sig-bar-fill" style="width:8%"></div></div><span class="sig-num">23</span></div></div>
+      <div class="sig-row"><span class="sig-country">🇬🇧 United Kingdom</span><div style="display:flex;align-items:center"><div class="sig-bar-wrap"><div class="sig-bar-fill" style="width:7%"></div></div><span class="sig-num">21</span></div></div>
+      <div class="sig-row"><span class="sig-country">🇩🇪 Germany</span><div style="display:flex;align-items:center"><div class="sig-bar-wrap"><div class="sig-bar-fill" style="width:7%"></div></div><span class="sig-num">20</span></div></div>
+      <div class="sig-row"><span class="sig-country">🇳🇱 Netherlands</span><div style="display:flex;align-items:center"><div class="sig-bar-wrap"><div class="sig-bar-fill" style="width:6%"></div></div><span class="sig-num">16</span></div></div>
+      <div class="sig-row"><span class="sig-country">🇨🇦 Canada</span><div style="display:flex;align-items:center"><div class="sig-bar-wrap"><div class="sig-bar-fill" style="width:2%"></div></div><span class="sig-num">5</span></div></div>
+      <div class="sig-row"><span class="sig-country">🇮🇹 Italy</span><div style="display:flex;align-items:center"><div class="sig-bar-wrap"><div class="sig-bar-fill" style="width:1%"></div></div><span class="sig-num">3</span></div></div>
+      <div class="sig-row"><span class="sig-country">🇮🇳 India</span><div style="display:flex;align-items:center"><div class="sig-bar-wrap"><div class="sig-bar-fill" style="width:1%"></div></div><span class="sig-num">2</span></div></div>
+      <div class="sig-row"><span class="sig-country">🇿🇦 South Africa</span><div style="display:flex;align-items:center"><div class="sig-bar-wrap"><div class="sig-bar-fill" style="width:1%"></div></div><span class="sig-num">2</span></div></div>
+      <div class="sig-row"><span class="sig-country" style="color:var(--muted)">?? Unlocated</span><div style="display:flex;align-items:center"><div class="sig-bar-wrap"><div class="sig-bar-fill" style="width:100%;background:#444"></div></div><span class="sig-num" style="color:var(--muted)">611</span></div></div>
+    </div>
+
+    <!-- NEWS -->
+    <div class="sb" style="flex:1">
+      <div class="st">Latest · WHO / CDC / ProMED</div>
+      <div class="ni"><div class="ns">WHO DON599 · official</div><div class="nt">Andes hantavirus cluster MV Hondius — 8 cases, 3 deaths, 147 on board</div><div class="ntm">May 10, 2026</div></div>
+      <div class="ni"><div class="ns">CDC.GOV · 2h ago</div><div class="nt">CDC responding to outbreak — working with State Dept to bring Americans home safely</div><div class="ntm">May 11, 2026</div></div>
+      <div class="ni"><div class="ns">BBC · 1h ago</div><div class="nt">Tourist hotspot at "end of the world" (Patagonia) denies causing hantavirus outbreak</div><div class="ntm">May 11, 2026</div></div>
+      <div class="ni"><div class="ns">NPR · 5h ago</div><div class="nt">WHO Director: "This is not another COVID-19" — current public risk remains low</div><div class="ntm">May 11, 2026</div></div>
+      <div class="ni"><div class="ns">Deutschlandfunk · 4h ago</div><div class="nt">4 German passengers evacuated from Tenerife — en route to Frankfurt quarantine</div><div class="ntm">May 11, 2026</div></div>
+      <div class="ni"><div class="ns">NY Times · 5h ago</div><div class="nt">MV Hondius arrives Canary Islands for disembarkation — evacuation underway</div><div class="ntm">May 11, 2026</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- AMAZON ADS — Open Graph / direct product image via wsrv.nl proxy -->
+<div class="ads">
+  <div class="al">SPONSORED — Protect Yourself · Amazon</div>
+  <div class="ag">
+
+    <a class="ac" href="https://www.amazon.com/dp/B08CS49MFH?tag=hantavirususa-20" target="_blank" rel="noopener">
+      <div class="ai">
+        <img src="https://wsrv.nl/?url=https://m.media-amazon.com/images/I/71yKKqn6qTL._AC_SL300_.jpg&w=200&h=200&fit=contain&bg=white" alt="N95 Mask"
+             onerror="this.src='https://wsrv.nl/?url=https://images-na.ssl-images-amazon.com/images/I/71yKKqn6qTL.jpg&w=200'"/>
+      </div>
+      <div class="ainfo"><div class="an">N95 Respirator Masks 20pk</div><div class="ap">from $12.99</div></div>
+    </a>
+
+    <a class="ac" href="https://www.amazon.com/dp/B07D6S52X3?tag=hantavirususa-20" target="_blank" rel="noopener">
+      <div class="ai">
+        <img src="https://wsrv.nl/?url=https://m.media-amazon.com/images/I/71GJwBJx+IL._AC_SL300_.jpg&w=200&h=200&fit=contain&bg=white" alt="Nitrile Gloves"
+             onerror="this.src='https://wsrv.nl/?url=https://images-na.ssl-images-amazon.com/images/I/81N7+UQMCKL.jpg&w=200'"/>
+      </div>
+      <div class="ainfo"><div class="an">Nitrile Gloves 100pk</div><div class="ap">from $9.99</div></div>
+    </a>
+
+    <a class="ac" href="https://www.amazon.com/dp/B086YP8D4J?tag=hantavirususa-20" target="_blank" rel="noopener">
+      <div class="ai">
+        <img src="https://wsrv.nl/?url=https://m.media-amazon.com/images/I/61VwH3FTYRL._AC_SL300_.jpg&w=200&h=200&fit=contain&bg=white" alt="Hand Sanitizer"
+             onerror="this.src='https://wsrv.nl/?url=https://images-na.ssl-images-amazon.com/images/I/61VwH3FTYRL.jpg&w=200'"/>
+      </div>
+      <div class="ainfo"><div class="an">Hand Sanitizer 1L</div><div class="ap">from $7.49</div></div>
+    </a>
+
+    <a class="ac" href="https://www.amazon.com/dp/B08HLPJMR1?tag=hantavirususa-20" target="_blank" rel="noopener">
+      <div class="ai">
+        <img src="https://wsrv.nl/?url=https://m.media-amazon.com/images/I/61p3nWxJy-L._AC_SL300_.jpg&w=200&h=200&fit=contain&bg=white" alt="Coverall"
+             onerror="this.src='https://wsrv.nl/?url=https://images-na.ssl-images-amazon.com/images/I/61p3nWxJy-L.jpg&w=200'"/>
+      </div>
+      <div class="ainfo"><div class="an">Protective Coverall Suit</div><div class="ap">from $18.99</div></div>
+    </a>
+
+    <a class="ac" href="https://www.amazon.com/dp/B07NS3ZN7T?tag=hantavirususa-20" target="_blank" rel="noopener">
+      <div class="ai">
+        <img src="https://wsrv.nl/?url=https://m.media-amazon.com/images/I/61NHpk-Z9-L._AC_SL300_.jpg&w=200&h=200&fit=contain&bg=white" alt="Pulse Oximeter"
+             onerror="this.src='https://wsrv.nl/?url=https://images-na.ssl-images-amazon.com/images/I/61NHpk-Z9-L.jpg&w=200'"/>
+      </div>
+      <div class="ainfo"><div class="an">Pulse Oximeter Monitor</div><div class="ap">from $19.99</div></div>
+    </a>
+
+    <a class="ac" href="https://www.amazon.com/dp/B00AOX5IB6?tag=hantavirususa-20" target="_blank" rel="noopener">
+      <div class="ai">
+        <img src="https://wsrv.nl/?url=https://m.media-amazon.com/images/I/81G6RnnQ7vL._AC_SL300_.jpg&w=200&h=200&fit=contain&bg=white" alt="First Aid Kit"
+             onerror="this.src='https://wsrv.nl/?url=https://images-na.ssl-images-amazon.com/images/I/81G6RnnQ7vL.jpg&w=200'"/>
+      </div>
+      <div class="ainfo"><div class="an">Emergency First Aid Kit</div><div class="ap">from $24.99</div></div>
+    </a>
+
+  </div>
+</div>
+
+<script>
+const map = L.map('map',{center:[30,-10],zoom:3,zoomControl:true});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  attribution:'© OpenStreetMap © CartoDB · Data: WHO/CDC/ProMED via hantavirusmap.com',maxZoom:19
+}).addTo(map);
+
+// ===== REAL DATA from hantavirusmap.com + WHO DON599 =====
+
+// MV HONDIUS — precise locations
+const confirmed = [
+  {lat:28.12,lng:-16.55,label:'MV Hondius — Tenerife Port',sub:'Docked Granadilla de Abona',cases:8,deaths:3,signals:286,note:'WHO DON599 confirmed',col:'#E63946',r:15000},
+  {lat:-54.8,lng:-68.3,label:'Ushuaia, Argentina',sub:'Patagonia — exposure origin',cases:2,deaths:2,signals:26,note:'Birdwatching landfill excursion',col:'#E63946',r:12000},
+  {lat:-34.6,lng:-58.38,label:'Buenos Aires, Argentina',sub:'Patagonia region',cases:0,deaths:0,signals:18,note:'PAHO seasonal surveillance',col:'#F4A261',r:18000},
+];
+
+// US monitoring cities — CDC confirmed
+const usMonitor = [
+  {lat:29.76,lng:-95.37,label:'Houston, Texas',sub:'CDC monitoring — returned passenger',signals:5},
+  {lat:25.76,lng:-80.19,label:'Miami, Florida',sub:'CDC monitoring — returned passenger',signals:4},
+  {lat:34.05,lng:-118.24,label:'Los Angeles, California',sub:'CDC monitoring — returned passenger',signals:4},
+  {lat:40.71,lng:-74.01,label:'New York City, NY',sub:'CDC monitoring — returned passenger',signals:5},
+  {lat:47.61,lng:-122.33,label:'Seattle, Washington',sub:'CDC monitoring — returned passenger',signals:5},
+  // Four Corners endemic region
+  {lat:36.99,lng:-109.04,label:'Four Corners Region, USA',sub:'Sin Nombre hantavirus endemic',signals:3,endemic:true},
+];
+
+// Europe — signal-based from hantavirusmap data
+const europeSignals = [
+  {lat:51.51,lng:-0.13,label:'United Kingdom',sub:'21 signals · army island response',signals:21,col:'#F4A261',r:20000},
+  {lat:51.17,lng:10.45,label:'Germany',sub:'20 signals · 4 passengers Frankfurt',signals:20,col:'#F4A261',r:18000},
+  {lat:52.37,lng:4.9,label:'Netherlands',sub:'16 signals · Dutch victims aboard',signals:16,col:'#F4A261',r:15000},
+  {lat:45.46,lng:9.19,label:'Italy',sub:'3 signals · monitoring',signals:3,col:'#52B788',r:10000},
+  {lat:46.23,lng:2.21,label:'France',sub:'1 signal',signals:1,col:'#52B788',r:8000},
+  {lat:60.47,lng:8.47,label:'Norway',sub:'1 signal',signals:1,col:'#52B788',r:8000},
+  {lat:23.68,lng:-102.55,label:'Mexico',sub:'2 signals · monitoring returned travelers',signals:2,col:'#52B788',r:10000},
+  {lat:13.19,lng:-59.54,label:'Barbados / Cape Verde',sub:'2 signals · CV',signals:2,col:'#52B788',r:8000},
+  {lat:24,lng:78,label:'India',sub:'2 signals',signals:2,col:'#52B788',r:10000},
+  {lat:-29,lng:25,label:'South Africa',sub:'2 signals',signals:2,col:'#52B788',r:10000},
+  {lat:43.7,lng:-79.4,label:'Canada',sub:'5 signals · monitoring',signals:5,col:'#52B788',r:12000},
+];
+
+// Patagonia endemic belt
+const endemic = [
+  {lat:-42,lng:-71,label:'Patagonia — Endemic Belt',sub:'Andes virus seasonal · PAHO ongoing',col:'#52B788',r:120000},
+  {lat:36.5,lng:-108,label:'Four Corners — Endemic',sub:'Sin Nombre hantavirus · CDC annual cases',col:'#52B788',r:90000},
+  {lat:55,lng:37,label:'Russia — HFRS Endemic',sub:'Hantaan/Seoul hantavirus',col:'#52B788',r:200000},
+  {lat:36,lng:127,label:'Korea — HFRS Endemic',sub:'Hantaan virus · annual cases',col:'#52B788',r:80000},
+];
+
+function popup(p) {
+  return `<div style="font-family:Inter,sans-serif;min-width:195px">
+    <div style="font-weight:600;font-size:13px;margin-bottom:3px">${p.label}</div>
+    <div style="font-size:11px;color:#888;margin-bottom:7px">${p.sub||''}</div>
+    ${p.cases!=null?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;text-align:center;margin-bottom:7px">
+      <div><div style="color:#E63946;font-size:17px;font-family:monospace;font-weight:700">${p.cases}</div><div style="font-size:9px;color:#666">CASES</div></div>
+      <div><div style="color:#F4A261;font-size:17px;font-family:monospace;font-weight:700">${p.deaths}</div><div style="font-size:9px;color:#666">DEATHS</div></div>
+    </div>`:''}
+    ${p.signals?`<div style="padding:3px 6px;background:rgba(244,162,97,.12);border-radius:3px;font-size:10px;color:#F4A261;font-family:monospace;text-align:center">${p.signals} SIGNALS · WHO/CDC/ProMED</div>`:''}
+    ${p.note?`<div style="margin-top:5px;font-size:10px;color:#666">${p.note}</div>`:''}
+  </div>`;
+}
+
+confirmed.forEach(p=>{
+  L.circle([p.lat,p.lng],{color:p.col,fillColor:p.col,fillOpacity:.3,weight:2,radius:p.r,opacity:.9}).addTo(map).bindPopup(popup(p));
+  L.circle([p.lat,p.lng],{color:p.col,fill:false,weight:1,radius:p.r*2,opacity:.2,dashArray:'4 4'}).addTo(map);
+});
+
+usMonitor.forEach(p=>{
+  const col = p.endemic ? '#52B788' : '#F4A261';
+  L.circle([p.lat,p.lng],{color:col,fillColor:col,fillOpacity:.22,weight:1.5,radius:p.endemic?60000:18000,opacity:.8})
+   .addTo(map).bindPopup(`<div style="font-family:Inter,sans-serif;min-width:180px">
+    <div style="font-weight:600;font-size:13px;margin-bottom:3px">${p.label}</div>
+    <div style="font-size:11px;color:#888;margin-bottom:6px">${p.sub}</div>
+    <div style="padding:3px 6px;background:rgba(244,162,97,.12);border-radius:3px;font-size:10px;color:#F4A261;font-family:monospace;text-align:center">${p.signals} SIGNALS · CDC</div>
+    <div style="margin-top:5px;font-size:10px;color:#52B788">✓ 0 confirmed cases — monitoring only</div>
+  </div>`);
+});
+
+europeSignals.forEach(p=>{
+  L.circle([p.lat,p.lng],{color:p.col,fillColor:p.col,fillOpacity:.2,weight:1.5,radius:p.r,opacity:.7}).addTo(map).bindPopup(popup(p));
+});
+
+endemic.forEach(p=>{
+  L.circle([p.lat,p.lng],{color:p.col,fillColor:p.col,fillOpacity:.08,weight:1,radius:p.r,opacity:.3,dashArray:'6 4'}).addTo(map)
+   .bindPopup(`<div style="font-family:Inter,sans-serif"><div style="font-weight:600;font-size:13px;margin-bottom:3px">${p.label}</div><div style="font-size:11px;color:#888">${p.sub}</div></div>`);
+});
+
+function go(lat,lng,z){map.flyTo([lat,lng],z,{duration:1.2})}
+
+function tick(){
+  const n=new Date();
+  document.getElementById('clk').textContent=
+    n.toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC'})+' UTC';
+}
+tick(); setInterval(tick,30000);
+</script>
+</body>
+</html>
